@@ -1,0 +1,30 @@
+service: auth-service
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:*:*:*"
+
+functions:
+  signUp:
+    handler: handler.signUp
+    events:
+      - http:
+          path: signup
+          method: post
+
+  login:
+    handler: handler.login
+    events:
+      - http:
+          path: login
+          method: post
