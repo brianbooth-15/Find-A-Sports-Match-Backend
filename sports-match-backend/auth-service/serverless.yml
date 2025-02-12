@@ -3,7 +3,7 @@ service: auth-service
 provider:
   name: aws
   runtime: nodejs18.x
-  region: us-east-1
+  region: eu-west-1
   iam:
     role:
       statements:
@@ -13,6 +13,14 @@ provider:
             - logs:CreateLogStream
             - logs:PutLogEvents
           Resource: "arn:aws:logs:*:*:*"
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Scan
+            - dynamodb:Query
+          Resource: "arn:aws:dynamodb:eu-west-1:*:table/UsersTable"
 
 functions:
   signUp:
@@ -28,3 +36,19 @@ functions:
       - http:
           path: login
           method: post
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UsersTable
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5

@@ -5,7 +5,8 @@ const jwt = require('jsonwebtoken');
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = "UsersTable";
 
-exports.register = async (event) => {
+// Register (Sign Up) function
+exports.signUp = async (event) => {
   const { email, password } = JSON.parse(event.body);
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -21,6 +22,7 @@ exports.register = async (event) => {
   };
 };
 
+// Login function
 exports.login = async (event) => {
   const { email, password } = JSON.parse(event.body);
 

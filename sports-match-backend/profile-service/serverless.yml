@@ -1,0 +1,63 @@
+service: profile-service
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: eu-west-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:eu-west-1:*:table/UserProfiles"
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:*:*:*"
+
+functions:
+  createProfile:
+    handler: handler.createProfile
+    events:
+      - http:
+          path: profile
+          method: post
+          cors: true
+
+  getProfile:
+    handler: handler.getProfile
+    events:
+      - http:
+          path: profile/{email}
+          method: get
+          cors: true
+
+  updateProfile:
+    handler: handler.updateProfile
+    events:
+      - http:
+          path: profile
+          method: put
+          cors: true
+
+resources:
+  Resources:
+    UserProfilesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UserProfiles
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
