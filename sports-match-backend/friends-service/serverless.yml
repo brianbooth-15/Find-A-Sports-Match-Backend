@@ -1,0 +1,42 @@
+service: match-friends-service
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: eu-west-1
+  environment:
+    JWT_SECRET: "your-very-secret-key"  # Secure this in AWS Secrets Manager
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+          Resource: 
+            - "arn:aws:dynamodb:eu-west-1:675051814097:table/UserProfiles"
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 
+            - "arn:aws:logs:eu-west-1:675051814097:*"
+
+functions:
+  matchFriends:
+    handler: handler.matchFriends
+    events:
+      - http:
+          path: matchFriends
+          method: post
+          cors: true
+
+  optionsHandler:
+    handler: handler.options
+    events:
+      - http:
+          path: matchFriends
+          method: options
+          cors: true

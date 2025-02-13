@@ -29,6 +29,12 @@ functions:
       - http:
           path: signup
           method: post
+          cors:
+            origin: "*" # Allow all origins (or specify your domain)
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
 
   login:
     handler: handler.login
@@ -36,6 +42,12 @@ functions:
       - http:
           path: login
           method: post
+          cors:
+            origin: "*" # Allow all origins (or specify your domain)
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
 
 resources:
   Resources:

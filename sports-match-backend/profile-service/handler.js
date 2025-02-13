@@ -1,85 +1,146 @@
 const AWS = require("aws-sdk");
+const jwt = require("jsonwebtoken");
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const PROFILE_TABLE = "UserProfiles";
+const JWT_SECRET = process.env.JWT_SECRET || "your-very-secret-key";
 
-// 📌 Create or update a user profile
+// ✅ Common CORS Headers
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "OPTIONS, GET, POST, PUT",
+};
+
+// ✅ Verify JWT Token
+const verifyToken = (event) => {
+  const authHeader = event.headers?.Authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new Error("Unauthorized");
+  }
+  const token = authHeader.split(" ")[1];
+  return jwt.verify(token, JWT_SECRET);
+};
+
+// 📌 **Create or Update Profile**
 exports.createProfile = async (event) => {
   try {
-    const { email, name, dob, availability, selectedSports, radius, location } = JSON.parse(event.body);
-
-    if (!email) {
-      return { statusCode: 400, body: JSON.stringify({ message: "Email is required." }) };
-    }
+    const user = verifyToken(event); // 🔐 Authenticate user
+    const { name, dob, availability, selectedSports, radius, location } = JSON.parse(event.body);
 
     const profileData = {
       TableName: PROFILE_TABLE,
-      Item: { email, name, dob, availability, selectedSports, radius, location },
+      Item: { email: user.email, name, dob, availability, selectedSports, radius, location },
     };
 
     await dynamoDB.put(profileData).promise();
 
-    return { statusCode: 201, body: JSON.stringify({ message: "Profile created successfully!" }) };
+    return {
+      statusCode: 201,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: "Profile created/updated successfully!" }),
+    };
   } catch (error) {
-    console.error("Error creating profile:", error);
-    return { statusCode: 500, body: JSON.stringify({ message: "Internal Server Error" }) };
+    console.error("CreateProfile Error:", error);
+    return {
+      statusCode: error.message === "Unauthorized" ? 401 : 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: error.message }),
+    };
   }
 };
 
-// 📌 Fetch user profile by email
+// 📌 **Fetch Profile**
 exports.getProfile = async (event) => {
   try {
-    const { email } = event.pathParameters;
+    const user = verifyToken(event); // 🔐 Authenticate user
 
     const params = {
       TableName: PROFILE_TABLE,
-      Key: { email },
+      Key: { email: user.email },
     };
 
     const result = await dynamoDB.get(params).promise();
 
     if (!result.Item) {
-      return { statusCode: 404, body: JSON.stringify({ message: "Profile not found." }) };
+      return {
+        statusCode: 404,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ message: "Profile not found." }),
+      };
     }
 
-    return { statusCode: 200, body: JSON.stringify(result.Item) };
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify(result.Item),
+    };
   } catch (error) {
-    console.error("Error fetching profile:", error);
-    return { statusCode: 500, body: JSON.stringify({ message: "Internal Server Error" }) };
+    console.error("GetProfile Error:", error);
+    return {
+      statusCode: error.message === "Unauthorized" ? 401 : 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: error.message }),
+    };
   }
 };
 
-// 📌 Update user profile
+// 📌 **Update Profile**
 exports.updateProfile = async (event) => {
   try {
-    const { email, name, dob, availability, selectedSports, radius, location } = JSON.parse(event.body);
+    const user = verifyToken(event); // 🔐 Authenticate user
+    const { name, dob, availability, selectedSports, radius, location } = JSON.parse(event.body);
 
-    if (!email) {
-      return { statusCode: 400, body: JSON.stringify({ message: "Email is required." }) };
+    const updateExpression = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    if (name) {
+      updateExpression.push("#name = :name");
+      expressionAttributeNames["#name"] = "name";
+      expressionAttributeValues[":name"] = name;
+    }
+    if (dob) updateExpression.push("dob = :dob"), (expressionAttributeValues[":dob"] = dob);
+    if (availability) updateExpression.push("availability = :availability"), (expressionAttributeValues[":availability"] = availability);
+    if (selectedSports) updateExpression.push("selectedSports = :selectedSports"), (expressionAttributeValues[":selectedSports"] = selectedSports);
+    if (radius) updateExpression.push("radius = :radius"), (expressionAttributeValues[":radius"] = radius);
+    if (location) updateExpression.push("location = :location"), (expressionAttributeValues[":location"] = location);
+
+    if (updateExpression.length === 0) {
+      return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ message: "No fields to update." }) };
     }
 
     const updateParams = {
       TableName: PROFILE_TABLE,
-      Key: { email },
-      UpdateExpression:
-        "set #name = :name, dob = :dob, availability = :availability, selectedSports = :selectedSports, radius = :radius, location = :location",
-      ExpressionAttributeNames: { "#name": "name" }, // 'name' is a reserved keyword in DynamoDB
-      ExpressionAttributeValues: {
-        ":name": name || null,
-        ":dob": dob || null,
-        ":availability": availability || null,
-        ":selectedSports": selectedSports || null,
-        ":radius": radius || 10,
-        ":location": location || null,
-      },
+      Key: { email: user.email },
+      UpdateExpression: `SET ${updateExpression.join(", ")}`,
+      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length ? expressionAttributeNames : undefined,
+      ExpressionAttributeValues,
       ReturnValues: "UPDATED_NEW",
     };
 
     await dynamoDB.update(updateParams).promise();
 
-    return { statusCode: 200, body: JSON.stringify({ message: "Profile updated successfully!" }) };
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: "Profile updated successfully!" }),
+    };
   } catch (error) {
-    console.error("Error updating profile:", error);
-    return { statusCode: 500, body: JSON.stringify({ message: "Internal Server Error" }) };
+    console.error("UpdateProfile Error:", error);
+    return {
+      statusCode: error.message === "Unauthorized" ? 401 : 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: error.message }),
+    };
   }
+};
+
+// 📌 **OPTIONS Handler (CORS Fix)**
+exports.options = async () => {
+  return {
+    statusCode: 200,
+    headers: CORS_HEADERS,
+    body: JSON.stringify({ message: "CORS preflight successful" }),
+  };
 };

@@ -4,6 +4,8 @@ provider:
   name: aws
   runtime: nodejs18.x
   region: eu-west-1
+  environment:
+    JWT_SECRET: "your-very-secret-key"  # Secure this in AWS Secrets Manager
   iam:
     role:
       statements:
@@ -36,7 +38,7 @@ functions:
     handler: handler.getProfile
     events:
       - http:
-          path: profile/{email}
+          path: profile
           method: get
           cors: true
 
@@ -46,6 +48,14 @@ functions:
       - http:
           path: profile
           method: put
+          cors: true
+
+  optionsHandler:
+    handler: handler.options
+    events:
+      - http:
+          path: profile
+          method: options
           cors: true
 
 resources:
